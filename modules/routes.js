@@ -1,8 +1,4 @@
-const defaultDungeon = {
-  
-};
-
-module.exports = function(app, auth, MongoClient, mongoUrl) {
+module.exports = function(app, auth, MongoClient, mongoUrl, defaultDungeon) {
   const resFileOptions = { root: './views' };
   
   app.get('/', (req, res) => {
@@ -44,7 +40,7 @@ module.exports = function(app, auth, MongoClient, mongoUrl) {
     if (name.length > 30) name = name.substring(0, 30);
     if (username.length > 20) username = username.substring(0, 20);
     if (password.length > 20) password = password.substring(0, 20);
-    const registerResult = await auth.register(username, password, { name: name, xp: 0 });
+    const registerResult = await auth.register(username, password, { name: name, xp: 0, icon: 'brutal-helm' });
     
     if (registerResult) {
       let client = null;

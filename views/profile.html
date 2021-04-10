@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@5.x/css/materialdesignicons.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.min.css">
   <link rel="stylesheet" href="/css/general.css">
+  <link rel="stylesheet" href="/css/profile.css">
 </head>
 <body>
   <div id="app">
@@ -35,8 +36,10 @@
                   <v-avatar
                     color="primary"
                     size="48"
+                    @click="iconDialog = true"
+                    class="cursor-pointer"
                   >
-                    <v-img src="/icons/brutal-helm.svg"></v-img>
+                    <v-img :src="`/icons/${profile.icon}.svg`"></v-img>
                   </v-avatar>
                 </v-badge>
                 <span class="ml-md-4 mt-4 mt-md-0">
@@ -57,6 +60,38 @@
                 </v-progress-linear>
               </v-card-text>
             </v-card>
+            <v-dialog v-model="iconDialog" max-width="300">
+              <v-card>
+                <v-card-title class="pa-4">
+                  <span class="mx-auto">Change Icon</span>
+                </v-card-title>
+                <v-card-text class="px-4 py-0">
+                  <v-row no-gutters class="ma-n2" justify="center">
+                    <v-avatar
+                      v-for="(icon, i) in icons"
+                      :key="i"
+                      color="primary"
+                      size="48"
+                      class="ma-2 cursor-pointer"
+                      :class="{ 'selected-icon': selectedIcon === icon }"
+                      @click="selectedIcon = icon"
+                    >
+                      <v-img :src="`/icons/${icon}.svg`"></v-img>
+                    </v-avatar>
+                  </v-row>
+                </v-card-text>
+                <v-card-actions class="pa-2">
+                  <v-spacer></v-spacer>
+                  <v-btn text @click="cancelIconChange" class="ma-2">
+                    Cancel
+                  </v-btn>
+                  <v-btn color="primary" text @click="changeIcon" class="ma-2">
+                    Change
+                  </v-btn>
+                  <v-spacer></v-spacer>
+                </v-card-actions>
+              </v-card>
+            </v-dialog>
           </v-row>
         </template>
         <template v-else>
@@ -89,6 +124,13 @@
         ...vueData,
         profile: null,
         profileReceived: false,
+        iconDialog: false,
+        icons: [
+          'brutal-helm',
+          'overlord-helm',
+          'spiked-dragon-head',
+        ],
+        selectedIcon: 'brutal-helm',
       }),
       created() {
         socket.emit('fetch-profile');
@@ -99,6 +141,16 @@
         },
         xpPercent() {
           return this.profile.xp % 100;
+        },
+      },
+      methods: {
+        changeIcon() {
+          this.iconDialog = false;
+          socket.emit('change-icon', this.selectedIcon);
+        },
+        cancelIconChange() {
+          this.iconDialog = false;
+          this.selectedIcon = this.profile.icon;
         },
       },
     });

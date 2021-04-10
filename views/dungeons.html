@@ -22,17 +22,76 @@
       </v-app-bar>
       <v-main>
         <template v-if="dungeonsReceived">
-          <v-list dense nav>
-            <v-list-item
-              v-for="(dungeon, i) in dungeons"
-              :key="i"
-              :href="`/dungeon?id=${dungeon._id}`"
-            >
-              <v-list-item-content>
-                <v-list-item-title v-text="dungeon.name"></v-list-item-title>
-              </v-list-item-content>
-            </v-list-item>
-          </v-list>
+          <v-row no-gutters align="center" justify="center" class="full-height pa-4">
+            <v-list dense nav min-width="300" class="rounded">
+              <v-list-item>
+                <v-btn
+                  color="primary"
+                  elevation="2"
+                  @click="newDungeonDialog = true"
+                  class="mx-auto mt-2"
+                >New</v-btn>
+              </v-list-item>
+              <v-list-item
+                v-for="(dungeon, i) in dungeons"
+                :key="i"
+              >
+                <v-list-item-content :href="`/dungeon?id=${dungeon._id}`">
+                  <v-list-item-title v-text="dungeon.name"></v-list-item-title>
+                </v-list-item-content>
+                <v-list-item-action v-if="dungeon.name !== 'My Dungeon'">
+                  <v-btn icon>
+                    <v-icon color="error" @click="deleteDungeon(dungeon._id, i)">mdi-close-circle</v-icon>
+                  </v-btn>
+                </v-list-item-action>
+                <v-list-item-action>
+                  <v-btn icon :href="`/dungeon?id=${dungeon._id}`">
+                    <v-icon color="primary">mdi-eye</v-icon>
+                  </v-btn>
+                </v-list-item-action>
+              </v-list-item>
+            </v-list>
+            <v-dialog v-model="newDungeonDialog" max-width="300">
+              <v-card>
+                <v-card-title class="pa-4">
+                  <span class="mx-auto">Create A New Dungeon</span>
+                </v-card-title>
+                <v-card-text class="px-4 py-0">
+                  <v-form v-model="newDungeonValid" @submit.prevent>
+                    <v-text-field
+                      v-model="newDungeonName"
+                      label="Name"
+                      outlined
+                      required
+                      :rules="nameRules"
+                      :counter="30"
+                      @change="checkNameValid"
+                    ></v-text-field>
+                    <p
+                      class="text-center error--text mb-0"
+                      v-show="!newDungeonNameValid"
+                    >Name taken</p>
+                  </v-form>
+                </v-card-text>
+                <v-card-actions class="pa-2">
+                  <v-spacer></v-spacer>
+                  <v-btn text @click="newDungeonDialog = false" class="ma-2">
+                    Cancel
+                  </v-btn>
+                  <v-btn
+                    color="primary"
+                    text
+                    @click="createDungeon"
+                    class="ma-2"
+                    :disabled="!newDungeonValid || !newDungeonNameValid"
+                  >
+                    Create
+                  </v-btn>
+                  <v-spacer></v-spacer>
+                </v-card-actions>
+              </v-card>
+            </v-dialog>
+          </v-row>
         </template>
         <template v-else>
           <v-row no-gutters align="center" justify="center" class="full-height">
@@ -62,13 +121,42 @@
       ...vueConfig,
       data: () => ({
         ...vueData,
-        dungeons: [
-          
-        ],
+        dungeons: [],
         dungeonsReceived: false,
+        dungeonIndexToDelete: -1,
+        newDungeonDialog: false,
+        newDungeonName: '',
+        nameRules: [
+          v => !!v || 'Required',
+          v => (v || '').length >= 5 || 'Min 5 characters',
+          v => (v || '').length <= 30 || 'Max 30 characters',
+        ],
+        newDungeonValid: false,
+        newDungeonNameValid: true,
       }),
       created() {
         socket.emit('fetch-dungeons');
+      },
+      methods: {
+        createDungeon() {
+          this.newDungeonDialog = false;
+          socket.emit('create-dungeon', this.newDungeonName);
+          this.newDungeonName = '';
+        },
+        deleteDungeon(id, index) {
+          this.dungeonIndexToDelete = index;
+          socket.emit('delete-dungeon', id);
+        },
+        checkNameValid() {
+          for (const dungeon of this.dungeons) {
+            if (dungeon.name === this.newDungeonName) {
+              this.newDungeonNameValid = false;
+              return;
+            }
+          }
+          
+          this.newDungeonNameValid = true;
+        },
       },
     });
   </script>
