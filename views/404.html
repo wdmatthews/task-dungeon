@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">
+  <title>Error 404 | Task Dungeon</title>
+  
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@5.x/css/materialdesignicons.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.min.css">
+  <link rel="stylesheet" href="/css/general.css">
+</head>
+<body>
+  <div id="app">
+    <v-app>
+      <v-main>
+        <v-row no-gutters align="center" justify="center" class="full-height">
+          <div class="pa-4">
+            <h2 class="text-center text-h2 mb-8">Error 404</h2>
+            <p><strong>{{ class1 }}</strong> Hmmm. This quest says to find {{ number }} {{ item }}, but they aren't on the map.</p>
+            <p><strong>{{ class2 }}</strong> That is weird for sure. Have you tried looking <a href="/">here</a>?</p>
+            <p><strong>{{ class1 }}</strong> Thanks, I'll try that.</p>
+          </div>
+        </v-row>
+      </v-main>
+    </v-app>
+  </div>
+  
+  <script src="https://cdn.jsdelivr.net/npm/vue@2.x/dist/vue.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.js"></script>
+  <script src="/js/vue-config.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/socket-client.js"></script>
+  
+  <script>
+    function randomNumber(min, max) {
+      return Math.floor((Math.random() * (max - min)) + min);
+    }
+    
+    const questItems = [
+      'magic beans',
+      'apples',
+      'blue flowers',
+      'green rocks',
+    ];
+    
+    const classes = [
+      'Fighter',
+      'Healer',
+      'Ranger',
+      'Rogue',
+      'Wizard',
+    ];
+    
+    function getClass() {
+      const index = randomNumber(0, classes.length - 1);
+      const c = classes[index];
+      classes.splice(index, 1);
+      return c;
+    }
+    
+    const vue = new Vue({
+      ...vueConfig,
+      data: () => ({
+        ...vueData,
+        number: randomNumber(2, 10),
+        item: questItems[randomNumber(0, questItems.length - 1)],
+        class1: getClass(),
+        class2: getClass(),
+      }),
+    });
+  </script>
+</body>
+</html>

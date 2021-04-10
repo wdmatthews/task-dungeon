@@ -1,0 +1,26 @@
+{
+  "name": "task-dungeon",
+  "version": "1.0.0",
+  "description": "A medieval task manager that rewards you for completing tasks.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "task",
+    "manager",
+    "dungeon"
+  ],
+  "author": "Wesley Matthews",
+  "license": "MIT",
+  "dependencies": {
+    "bcrypt": "^5.0.1",
+    "bson": "^1.1.6",
+    "connect-mongo": "^4.4.1",
+    "express": "^4.17.1",
+    "express-session": "^1.17.1",
+    "http": "^0.0.1-security",
+    "mongodb": "^3.6.6",
+    "socket.io": "^4.0.1"
+  }
+}

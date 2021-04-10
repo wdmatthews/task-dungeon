@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">
+  <title>Dungeon Name | Task Dungeon</title>
+  
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@5.x/css/materialdesignicons.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.min.css">
+  <link rel="stylesheet" href="/css/general.css">
+  <link rel="stylesheet" href="/css/dungeon.css">
+</head>
+<body>
+  <div id="app">
+    <v-app>
+      <v-app-bar app>
+        <v-tabs optional>
+          <v-tab class="ml-auto" href="/dungeons">Dungeons</v-tab>
+          <v-tab class="mr-auto" href="/logout">Logout</v-tab>
+        </v-tabs>
+      </v-app-bar>
+      <v-main>
+        <template v-if="dungeonReceived">
+          <template v-if="dungeon">
+            
+          </template>
+          <template v-else>
+            <v-row no-gutters align="center" justify="center" class="full-height">
+              <div>
+                <p>Dungeon not found. Try looking for it <a href="/dungeons">here</a>.</p>
+              </div>
+            </v-row>
+          </template>
+        </template>
+        <template v-else>
+          <v-row no-gutters align="center" justify="center" class="full-height">
+            <div>
+              <p class="text-center">
+                <v-progress-circular
+                  indeterminate
+                  color="primary"
+                ></v-progress-circular>
+              </p>
+              <p>Loading dungeon...</p>
+            </div>
+          </v-row>
+        </template>
+      </v-main>
+    </v-app>
+  </div>
+  
+  <script src="https://cdn.jsdelivr.net/npm/vue@2.x/dist/vue.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.js"></script>
+  <script src="/js/vue-config.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/socket-client.js"></script>
+  
+  <script>
+    const vue = new Vue({
+      ...vueConfig,
+      data: () => ({
+        ...vueData,
+        dungeonID: (new URL(document.location)).searchParams.get('id'),
+        dungeon: null,
+        dungeonReceived: false,
+      }),
+      created() {
+        socket.emit('fetch-dungeon', this.dungeonID);
+      },
+    });
+  </script>
+</body>
+</html>

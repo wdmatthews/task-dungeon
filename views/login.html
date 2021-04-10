@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">
+  <title>Login | Task Dungeon</title>
+  
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@5.x/css/materialdesignicons.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.min.css">
+  <link rel="stylesheet" href="/css/general.css">
+</head>
+<body>
+  <div id="app">
+    <v-app>
+      <v-main>
+        <v-row no-gutters align="center" justify="center" class="full-height">
+          <v-form action="/api/login" method="POST" v-model="formValid">
+            <v-card>
+              <v-card-title>
+                <span class="mx-auto">Login</span>
+              </v-card-title>
+              <v-card-text>
+                <v-alert
+                  type="error"
+                  v-model="showError"
+                  dismissible
+                  icon="mdi-alert-octagon"
+                >Incorrect username or password.</v-alert>
+                <v-text-field
+                  name="username"
+                  v-model="username"
+                  label="Username"
+                  outlined
+                  required
+                  :rules="usernameRules"
+                  :counter="20"
+                ></v-text-field>
+                <v-text-field
+                  name="password"
+                  v-model="password"
+                  label="Password"
+                  outlined
+                  required
+                  type="password"
+                  v-model="password"
+                  :append-icon="showPassword ? 'mdi-eye' : 'mdi-eye-off'"
+                  :rules="passwordRules"
+                  :type="showPassword ? 'text' : 'password'"
+                  hint="At least 8 characters"
+                  :counter="20"
+                  @click:append="showPassword = !showPassword"
+                ></v-text-field>
+              </v-card-text>
+              <v-card-actions class="px-4 pb-4 pt-0">
+                <v-spacer></v-spacer>
+                <v-btn color="primary" elevation="2" type="submit" :disabled="!formValid">Login</v-btn>
+                <v-spacer></v-spacer>
+              </v-card-actions>
+              <p class="text-center px-4 pb-4"><a href="/register">Register instead</a></p>
+            </v-card>
+          </v-form>
+        </v-row>
+      </v-main>
+    </v-app>
+  </div>
+  
+  <script src="https://cdn.jsdelivr.net/npm/vue@2.x/dist/vue.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.js"></script>
+  <script src="/js/vue-config.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/socket-client.js"></script>
+  
+  <script>
+    const vue = new Vue({
+      ...vueConfig,
+      data: () => ({
+        ...vueData,
+        username: '',
+        password: '',
+        showPassword: false,
+        usernameRules: [
+          v => !!v || 'Required',
+          v => (v || '').length >= 5 || 'Min 5 characters',
+          v => (v || '').length <= 20 || 'Max 20 characters',
+        ],
+        passwordRules: [
+          v => !!v || 'Required',
+          v => (v || '').length >= 8 || 'Min 8 characters',
+          v => (v || '').length <= 20 || 'Max 20 characters',
+        ],
+        formValid: false,
+        showError: location.search.includes('?error'),
+      }),
+    });
+  </script>
+</body>
+</html>
