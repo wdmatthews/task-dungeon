@@ -22,26 +22,19 @@
       </v-app-bar>
       <v-main>
         <template v-if="dungeonsReceived">
-          <v-row no-gutters align="center" justify="center" class="full-height pa-4">
+          <v-row no-gutters align="center" justify="center" class="full-height pa-4 flex-column">
             <v-list dense nav min-width="300" class="rounded">
-              <v-list-item>
-                <v-btn
-                  color="primary"
-                  elevation="2"
-                  @click="newDungeonDialog = true"
-                  class="mx-auto mt-2"
-                >New</v-btn>
-              </v-list-item>
+              <v-subheader>Your Dungeons</v-subheader>
               <v-list-item
                 v-for="(dungeon, i) in dungeons"
                 :key="i"
               >
-                <v-list-item-content :href="`/dungeon?id=${dungeon._id}`">
+                <v-list-item-content>
                   <v-list-item-title v-text="dungeon.name"></v-list-item-title>
                 </v-list-item-content>
                 <v-list-item-action v-if="dungeon.name !== 'My Dungeon'">
                   <v-btn icon>
-                    <v-icon color="error" @click="deleteDungeon(dungeon._id, i)">mdi-close-circle</v-icon>
+                    <v-icon color="error" @click="deleteDungeon(i)">mdi-close-circle</v-icon>
                   </v-btn>
                 </v-list-item-action>
                 <v-list-item-action>
@@ -50,11 +43,35 @@
                   </v-btn>
                 </v-list-item-action>
               </v-list-item>
+              <v-list-item>
+                <v-btn
+                  color="primary"
+                  elevation="2"
+                  @click="newDungeonDialog = true"
+                  class="mx-auto mb-2"
+                >New</v-btn>
+              </v-list-item>
+            </v-list>
+            <v-list dense nav min-width="300" class="rounded mt-4">
+              <v-subheader>Other Dungeons</v-subheader>
+              <v-list-item
+                v-for="(dungeon, i) in otherDungeons"
+                :key="i"
+              >
+                <v-list-item-content>
+                  <v-list-item-title v-text="dungeon.name"></v-list-item-title>
+                </v-list-item-content>
+                <v-list-item-action>
+                  <v-btn icon :href="`/dungeon?join=${i}`">
+                    <v-icon color="primary">mdi-eye</v-icon>
+                  </v-btn>
+                </v-list-item-action>
+              </v-list-item>
             </v-list>
             <v-dialog v-model="newDungeonDialog" max-width="300">
               <v-card>
                 <v-card-title class="pa-4">
-                  <span class="mx-auto">Create A New Dungeon</span>
+                  <span class="mx-auto">Create Dungeon</span>
                 </v-card-title>
                 <v-card-text class="px-4 py-0">
                   <v-form v-model="newDungeonValid" @submit.prevent>
@@ -84,9 +101,30 @@
                     @click="createDungeon"
                     class="ma-2"
                     :disabled="!newDungeonValid || !newDungeonNameValid"
-                  >
-                    Create
+                  >Create</v-btn>
+                  <v-spacer></v-spacer>
+                </v-card-actions>
+              </v-card>
+            </v-dialog>
+            <v-dialog v-model="deleteDungeonDialog" max-width="300">
+              <v-card>
+                <v-card-title class="pa-4">
+                  <span class="mx-auto">Delete Dungeon</span>
+                </v-card-title>
+                <v-card-text class="px-4 py-0 text-center">
+                  Delete {{ dungeonIndexToDelete >= 0 ? dungeons[dungeonIndexToDelete].name : '' }}?
+                </v-card-text>
+                <v-card-actions class="pa-2">
+                  <v-spacer></v-spacer>
+                  <v-btn text @click="newDungeonDialog = false" class="ma-2">
+                    Cancel
                   </v-btn>
+                  <v-btn
+                    color="error"
+                    text
+                    @click="confirmDungeonDelete"
+                    class="ma-2"
+                  >Delete</v-btn>
                   <v-spacer></v-spacer>
                 </v-card-actions>
               </v-card>
@@ -122,8 +160,8 @@
       data: () => ({
         ...vueData,
         dungeons: [],
+        otherDungeons: [],
         dungeonsReceived: false,
-        dungeonIndexToDelete: -1,
         newDungeonDialog: false,
         newDungeonName: '',
         nameRules: [
@@ -133,6 +171,8 @@
         ],
         newDungeonValid: false,
         newDungeonNameValid: true,
+        dungeonIndexToDelete: -1,
+        deleteDungeonDialog: false,
       }),
       created() {
         socket.emit('fetch-dungeons');
@@ -143,10 +183,6 @@
           socket.emit('create-dungeon', this.newDungeonName);
           this.newDungeonName = '';
         },
-        deleteDungeon(id, index) {
-          this.dungeonIndexToDelete = index;
-          socket.emit('delete-dungeon', id);
-        },
         checkNameValid() {
           for (const dungeon of this.dungeons) {
             if (dungeon.name === this.newDungeonName) {
@@ -156,6 +192,14 @@
           }
           
           this.newDungeonNameValid = true;
+        },
+        deleteDungeon(index) {
+          this.dungeonIndexToDelete = index;
+          this.deleteDungeonDialog = true;
+        },
+        confirmDungeonDelete() {
+          this.deleteDungeonDialog = false;
+          socket.emit('delete-dungeon', this.dungeons[this.dungeonIndexToDelete]._id);
         },
       },
     });

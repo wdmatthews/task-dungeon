@@ -10,8 +10,9 @@ socket.on('change-icon', () => {
   vue.profile.icon = vue.selectedIcon;
 });
 
-socket.on('receive-dungeons', (dungeons) => {
+socket.on('receive-dungeons', (dungeons, otherDungeons) => {
   vue.dungeons = dungeons;
+  vue.otherDungeons = otherDungeons;
   vue.dungeonsReceived = true;
 });
 
@@ -29,4 +30,14 @@ socket.on('receive-dungeon', (dungeon) => {
   vue.dungeon = dungeon;
   vue.dungeonReceived = true;
   document.title = `${dungeon ? dungeon.name : 'Not Found'} | Task Dungeon`;
+});
+
+socket.on('add-user', (user) => {
+  vue.dungeon.otherUsers.push(user);
+});
+
+socket.on('remove-user', () => {
+  if (vue.userIndexToRemove < 0 || vue.userIndexToRemove >= vue.dungeon.otherUsers.length) return;
+  vue.dungeon.otherUsers.splice(vue.userIndexToRemove, 1);
+  vue.userIndexToRemove = -1;
 });

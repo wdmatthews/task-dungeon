@@ -40,16 +40,24 @@ module.exports = function(app, auth, MongoClient, mongoUrl, defaultDungeon) {
     if (name.length > 30) name = name.substring(0, 30);
     if (username.length > 20) username = username.substring(0, 20);
     if (password.length > 20) password = password.substring(0, 20);
-    const registerResult = await auth.register(username, password, { name: name, xp: 0, icon: 'brutal-helm' });
+    const registerResult = await auth.register(username, password, {
+      name: name,
+      xp: 0,
+      icon: 'brutal-helm',
+      joinedDungeons: [],
+    });
     
     if (registerResult) {
       let client = null;
+      
       try {
+        const dungeon = { name: 'My Dungeon', ...defaultDungeon };
+        delete dungeon.otherUsers;
         client = await MongoClient.connect(mongoUrl, { useUnifiedTopology: true });
         const dungeons = client
           .db('task_dungeon')
           .collection(`user_${registerResult}`);
-        await dungeons.insertOne({ name: 'My Dungeon', ...defaultDungeon });
+        await dungeons.insertOne(dungeon);
       } finally {
         await client.close();
       }

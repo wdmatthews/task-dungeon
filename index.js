@@ -9,7 +9,7 @@ const MongoStore = require('connect-mongo');
 const bcrypt = require('bcrypt');
 
 const defaultDungeon = {
-  
+  otherUsers: [],
 };
 
 require('./modules/initialization.js')(express, app, io, session, MongoStore, mongoUrl);

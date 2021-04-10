@@ -24,13 +24,96 @@
       <v-main>
         <template v-if="dungeonReceived">
           <template v-if="dungeon">
-            
+            <v-row no-gutters>
+              <v-col cols="12" class="pa-4" v-if="dungeon.name !== 'My Dungeon' && joiningIndex < 0">
+                <v-card max-width="500" class="mx-auto">
+                  <v-list dense nav min-width="300" class="rounded">
+                    <v-subheader>Other Users</v-subheader>
+                    <v-list-item
+                      v-for="(user, i) in dungeon.otherUsers"
+                      :key="i"
+                    >
+                      <v-list-item-content>
+                        <v-list-item-title v-text="user.name"></v-list-item-title>
+                      </v-list-item-content>
+                      <v-list-item-action>
+                        <v-btn icon>
+                          <v-icon color="error" @click="removeUser(i)">mdi-close-circle</v-icon>
+                        </v-btn>
+                      </v-list-item-action>
+                    </v-list-item>
+                    <v-list-item>
+                      <v-btn
+                        color="primary"
+                        elevation="2"
+                        @click="addUserDialog = true"
+                        class="mx-auto mb-2"
+                      >Add</v-btn>
+                    </v-list-item>
+                  </v-list>
+                </v-card>
+              </v-col>
+              <v-dialog v-model="addUserDialog" max-width="300">
+                <v-card>
+                  <v-card-title class="pa-4">
+                    <span class="mx-auto">Add User</span>
+                  </v-card-title>
+                  <v-card-text class="px-4 py-0">
+                    <v-form v-model="addUserValid" @submit.prevent>
+                      <v-text-field
+                        v-model="addUserUsername"
+                        label="Username"
+                        outlined
+                        required
+                        :rules="usernameRules"
+                        :counter="20"
+                      ></v-text-field>
+                    </v-form>
+                  </v-card-text>
+                  <v-card-actions class="pa-2">
+                    <v-spacer></v-spacer>
+                    <v-btn text @click="addUserDialog = false" class="ma-2">
+                      Cancel
+                    </v-btn>
+                    <v-btn
+                      color="primary"
+                      text
+                      @click="addUser"
+                      class="ma-2"
+                      :disabled="!addUserValid"
+                    >Add</v-btn>
+                    <v-spacer></v-spacer>
+                  </v-card-actions>
+                </v-card>
+              </v-dialog>
+              <v-dialog v-model="removeUserDialog" max-width="300">
+                <v-card>
+                  <v-card-title class="pa-4">
+                    <span class="mx-auto">Remove User</span>
+                  </v-card-title>
+                  <v-card-text class="px-4 py-0 text-center">
+                    Remove {{ userIndexToRemove >= 0 ? dungeon.otherUsers[userIndexToRemove].name : '' }}?
+                  </v-card-text>
+                  <v-card-actions class="pa-2">
+                    <v-spacer></v-spacer>
+                    <v-btn text @click="removeUserDialog = false" class="ma-2">
+                      Cancel
+                    </v-btn>
+                    <v-btn
+                      color="error"
+                      text
+                      @click="confirmUserRemove"
+                      class="ma-2"
+                    >Remove</v-btn>
+                    <v-spacer></v-spacer>
+                  </v-card-actions>
+                </v-card>
+              </v-dialog>
+            </v-row>
           </template>
           <template v-else>
             <v-row no-gutters align="center" justify="center" class="full-height">
-              <div>
-                <p>Dungeon not found. Try looking for it <a href="/dungeons">here</a>.</p>
-              </div>
+              <p>Dungeon not found. Try looking for it <a href="/dungeons">here</a>.</p>
             </v-row>
           </template>
         </template>
@@ -58,16 +141,44 @@
   <script src="/js/socket-client.js"></script>
   
   <script>
+    const searchParams = (new URL(document.location)).searchParams;
+    const joiningIndex = searchParams.get('join');
     const vue = new Vue({
       ...vueConfig,
       data: () => ({
         ...vueData,
-        dungeonID: (new URL(document.location)).searchParams.get('id'),
+        dungeonID: searchParams.get('id'),
+        joiningIndex: joiningIndex ? parseInt(joiningIndex) : -1,
         dungeon: null,
         dungeonReceived: false,
+        addUserDialog: false,
+        addUserValid: false,
+        addUserUsername: '',
+        usernameRules: [
+          v => !!v || 'Required',
+          v => (v || '').length >= 5 || 'Min 5 characters',
+          v => (v || '').length <= 20 || 'Max 20 characters',
+        ],
+        userIndexToRemove: -1,
+        removeUserDialog: false,
       }),
       created() {
-        socket.emit('fetch-dungeon', this.dungeonID);
+        socket.emit('fetch-dungeon', this.dungeonID, this.joiningIndex);
+      },
+      methods: {
+        addUser() {
+          this.addUserDialog = false;
+          socket.emit('add-user', this.dungeonID, this.addUserUsername);
+          this.addUserUsername = '';
+        },
+        removeUser(index) {
+          this.userIndexToRemove = index;
+          this.removeUserDialog = true;
+        },
+        confirmUserRemove() {
+          this.removeUserDialog = false;
+          socket.emit('remove-user', this.dungeonID, this.userIndexToRemove);
+        },
       },
     });
   </script>
