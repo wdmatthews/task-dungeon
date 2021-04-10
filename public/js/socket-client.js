@@ -1,5 +1,10 @@
 const socket = io();
 
+socket.on('receive-profile', (profile) => {
+  vue.profile = profile;
+  vue.profileReceived = true;
+});
+
 socket.on('receive-dungeons', (dungeons) => {
   vue.dungeons = dungeons;
   vue.dungeonsReceived = true;

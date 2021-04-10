@@ -17,6 +17,10 @@ module.exports = function(app, auth, MongoClient, mongoUrl) {
     res.sendFile('login.html', resFileOptions);
   });
   
+  app.get('/profile', auth.requireAuth('/login'), (req, res) => {
+    res.sendFile('profile.html', resFileOptions);
+  });
+  
   app.get('/dungeons', auth.requireAuth('/login'), (req, res) => {
     res.sendFile('dungeons.html', resFileOptions);
   });
@@ -28,15 +32,18 @@ module.exports = function(app, auth, MongoClient, mongoUrl) {
   app.get('/logout', auth.requireAuth('/dungeon'), auth.logout, (req, res) => res.redirect('/login'));
   
   app.post('/api/register', auth.requireNoAuth('/dungeon'), async (req, res) => {
-    const name = req.body.name;
-    const username = req.body.username;
-    const password = req.body.password;
+    let name = req.body.name;
+    let username = req.body.username;
+    let password = req.body.password;
     
     if (typeof name !== 'string' || typeof username !== 'string' || typeof password !== 'string') {
       res.redirect('/register?error');
       return;
     }
     
+    if (name.length > 30) name = name.substring(0, 30);
+    if (username.length > 20) username = username.substring(0, 20);
+    if (password.length > 20) password = password.substring(0, 20);
     const registerResult = await auth.register(username, password, { name: name, xp: 0 });
     
     if (registerResult) {
@@ -58,14 +65,16 @@ module.exports = function(app, auth, MongoClient, mongoUrl) {
   });
   
   app.post('/api/login', auth.requireNoAuth('/dungeon'), async (req, res) => {
-    const username = req.body.username;
-    const password = req.body.password;
+    let username = req.body.username;
+    let password = req.body.password;
     
     if (typeof username !== 'string' || typeof password !== 'string') {
       res.redirect('/login?error');
       return;
     }
     
+    if (username.length > 20) username = username.substring(0, 20);
+    if (password.length > 20) password = password.substring(0, 20);
     const loginResult = await auth.login(username, password);
     
     if (loginResult) {

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">
-  <title>Dungeons | Task Dungeon</title>
+  <title>Profile | Task Dungeon</title>
   
   <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@5.x/css/materialdesignicons.min.css">
@@ -21,18 +21,43 @@
         </v-tabs>
       </v-app-bar>
       <v-main>
-        <template v-if="dungeonsReceived">
-          <v-list dense nav>
-            <v-list-item
-              v-for="(dungeon, i) in dungeons"
-              :key="i"
-              :href="`/dungeon?id=${dungeon._id}`"
-            >
-              <v-list-item-content>
-                <v-list-item-title v-text="dungeon.name"></v-list-item-title>
-              </v-list-item-content>
-            </v-list-item>
-          </v-list>
+        <template v-if="profileReceived">
+          <v-row no-gutters align="center" justify="center" class="full-height pa-4">
+            <v-card min-width="300">
+              <v-card-title class="flex-column flex-md-row">
+                <v-badge
+                  bottom
+                  overlap
+                  color="success"
+                  :content="level"
+                  class="mx-auto mx-md-0"
+                >
+                  <v-avatar
+                    color="primary"
+                    size="48"
+                  >
+                    <v-img src="/icons/brutal-helm.svg"></v-img>
+                  </v-avatar>
+                </v-badge>
+                <span class="ml-md-4 mt-4 mt-md-0">
+                  {{ profile.name }}
+                </span>
+              </v-card-title>
+              <v-card-text>
+                <v-progress-linear
+                  color="success"
+                  height="24"
+                  :value="xpPercent"
+                  striped
+                  class="rounded-pill"
+                >
+                  <template v-slot:default="{ value }">
+                    <strong>{{ 100 - value }} XP to next level</strong>
+                  </template>
+                </v-progress-linear>
+              </v-card-text>
+            </v-card>
+          </v-row>
         </template>
         <template v-else>
           <v-row no-gutters align="center" justify="center" class="full-height">
@@ -43,7 +68,7 @@
                   color="primary"
                 ></v-progress-circular>
               </p>
-              <p>Loading dungeons...</p>
+              <p>Loading profile...</p>
             </div>
           </v-row>
         </template>
@@ -62,13 +87,19 @@
       ...vueConfig,
       data: () => ({
         ...vueData,
-        dungeons: [
-          
-        ],
-        dungeonsReceived: false,
+        profile: null,
+        profileReceived: false,
       }),
       created() {
-        socket.emit('fetch-dungeons');
+        socket.emit('fetch-profile');
+      },
+      computed: {
+        level() {
+          return Math.floor(this.profile.xp / 100) + 1;
+        },
+        xpPercent() {
+          return this.profile.xp % 100;
+        },
       },
     });
   </script>
