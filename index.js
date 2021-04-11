@@ -10,12 +10,14 @@ const bcrypt = require('bcrypt');
 
 const defaultDungeon = {
   otherUsers: [],
+  rooms: [],
 };
+const xpIncrement = 5;
 
 require('./modules/initialization.js')(express, app, io, session, MongoStore, mongoUrl);
 const auth = require('./modules/authentication.js')(
   MongoClient, bcrypt, mongoUrl, 'userID', 'task_dungeon', 'users');
 require('./modules/routes.js')(app, auth, MongoClient, mongoUrl, defaultDungeon);
-require('./modules/socket-server.js')(io, MongoClient, mongoUrl, defaultDungeon);
+require('./modules/socket-server.js')(io, MongoClient, mongoUrl, defaultDungeon, xpIncrement);
 
 http.listen(3000, () => console.log(`App listening at http://localhost:3000`));

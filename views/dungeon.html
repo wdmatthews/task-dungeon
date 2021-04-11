@@ -8,8 +8,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@5.x/css/materialdesignicons.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.min.css">
-  <link rel="stylesheet" href="/css/general.css">
-  <link rel="stylesheet" href="/css/dungeon.css">
+  <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
   <div id="app">
@@ -24,9 +23,15 @@
       <v-main>
         <template v-if="dungeonReceived">
           <template v-if="dungeon">
-            <v-row no-gutters>
-              <v-col cols="12" class="pa-4" v-if="dungeon.name !== 'My Dungeon' && joiningIndex < 0">
+            <v-row no-gutters class="pa-2">
+              <v-col cols="12" class="pa-2" v-if="dungeon.name !== 'My Dungeon' && joiningIndex < 0">
                 <v-card max-width="500" class="mx-auto">
+                  <v-alert
+                    type="error"
+                    v-model="showUserNotAdded"
+                    dismissible
+                    icon="mdi-alert-octagon"
+                  >User not found.</v-alert>
                   <v-list dense nav min-width="300" class="rounded">
                     <v-subheader>Other Users</v-subheader>
                     <v-list-item
@@ -109,6 +114,167 @@
                   </v-card-actions>
                 </v-card>
               </v-dialog>
+              <v-col cols="12" md="3" class="pa-2" v-for="(room, i) in dungeon.rooms" :key="i">
+                <v-card>
+                  <v-card-title class="pa-4">
+                    <span class="mx-auto" v-text="room.name"></span>
+                  </v-card-title>
+                  <v-card-text>
+                    <v-list flat three-line>
+                      <v-list-item v-for="(quest, j) in room.quests" :key="j">
+                        <v-list-item-action>
+                          <v-checkbox v-model="quest.completed" @change="toggleQuestComplete(i, j)"></v-checkbox>
+                        </v-list-item-action>
+                        <v-list-item-content>
+                          <v-list-item-title v-text="quest.name"></v-list-item-title>
+                          <v-list-item-subtitle>{{ quest.date ? `${formatDate(quest.date)}${(quest.time || quest.note) ? ' - ' : ''}` : '' }}{{ quest.time ? `${formatTime(quest.time)}${quest.note ? ' - ' : ''}` : '' }}{{ quest.note }}</v-list-item-subtitle>
+                        </v-list-item-content>
+                        <v-list-item-action>
+                          <v-btn icon @click="editQuest(i, j)">
+                            <v-icon color="primary">mdi-pencil</v-icon>
+                          </v-btn>
+                        </v-list-item-action>
+                        <v-list-item-action>
+                          <v-btn icon>
+                            <v-icon color="error" @click="deleteQuest(i, j)">mdi-close-circle</v-icon>
+                          </v-btn>
+                        </v-list-item-action>
+                      </v-list-item>
+                      <div class="text-center">
+                        <v-btn
+                          color="primary"
+                          elevation="2"
+                          @click="newQuest(i)"
+                        >New</v-btn>
+                      </div>
+                    </v-list>
+                  </v-card-text>
+                </v-card>
+              </v-col>
+              <v-dialog v-model="editQuestDialog" max-width="400" scrollable>
+                <v-card>
+                  <v-card-title class="pa-4">
+                    <span class="mx-auto">{{ editingQuest ? 'Edit' : 'Create' }} Quest</span>
+                  </v-card-title>
+                  <v-card-text class="px-4 py-1">
+                    <v-form v-model="editQuestValid" @submit.prevent>
+                      <v-text-field
+                        v-model="editQuestName"
+                        label="Name"
+                        outlined
+                        required
+                        :rules="questNameRules"
+                        :counter="30"
+                      ></v-text-field>
+                      <v-textarea
+                        v-model="editQuestNote"
+                        label="Note"
+                        outlined
+                        :rules="questNoteRules"
+                        :counter="50"
+                        rows="3"
+                        no-resize
+                      ></v-textarea>
+                      <v-menu
+                        v-model="editQuestDateMenu"
+                        :close-on-content-click="false"
+                        transition="scale-transition"
+                        offset-y
+                        max-width="300"
+                        min-width="auto"
+                      >
+                        <template v-slot:activator="{ on, attrs }">
+                          <v-text-field
+                            v-model="editQuestDateFormatted"
+                            label="Date"
+                            prepend-icon="mdi-calendar"
+                            v-bind="attrs"
+                            @blur="editQuestDate = parseDate(editQuestDateFormatted)"
+                            v-on="on"
+                            clearable
+                            outlined
+                          ></v-text-field>
+                        </template>
+                        <v-date-picker
+                          no-title
+                          @input="editQuestDateMenu = false"
+                          v-model="editQuestDate"
+                          full-width
+                          color="primary"
+                          first-day-of-week="1"
+                        ></v-date-picker>
+                      </v-menu>
+                      <v-menu
+                        v-model="editQuestTimeMenu"
+                        :close-on-content-click="false"
+                        transition="scale-transition"
+                        offset-y
+                        max-width="300"
+                        min-width="300"
+                      >
+                        <template v-slot:activator="{ on, attrs }">
+                          <v-text-field
+                            v-model="editQuestTimeFormatted"
+                            label="Time"
+                            prepend-icon="mdi-clock-time-four-outline"
+                            v-bind="attrs"
+                            @blur="editQuestTime = parseTime(editQuestTimeFormatted)"
+                            v-on="on"
+                            clearable
+                            outlined
+                            hide-details
+                          ></v-text-field>
+                        </template>
+                        <v-time-picker
+                          @click:minute="editQuestTimeMenu = false"
+                          v-model="editQuestTime"
+                          full-width
+                          color="primary"
+                          ampm-in-title
+                        ></v-time-picker>
+                      </v-menu>
+                    </v-form>
+                  </v-card-text>
+                  <v-card-actions class="pa-2">
+                    <v-spacer></v-spacer>
+                    <v-btn text @click="editQuestDialog = false" class="ma-2">
+                      Cancel
+                    </v-btn>
+                    <v-btn
+                      color="primary"
+                      text
+                      @click="editingQuest ? saveQuest() : createQuest()"
+                      class="ma-2"
+                      :disabled="!editQuestValid"
+                    >{{ editingQuest ? 'Save' : 'Create' }}</v-btn>
+                    <v-spacer></v-spacer>
+                  </v-card-actions>
+                </v-card>
+              </v-dialog>
+              <v-dialog v-model="deleteQuestDialog" max-width="300">
+                <v-card>
+                  <v-card-title class="pa-4">
+                    <span class="mx-auto">Delete Quest</span>
+                  </v-card-title>
+                  <v-card-text class="px-4 py-0 text-center">
+                    Delete {{ roomIndexQuestToDelete >= 0 ? dungeon.rooms[roomIndexQuestToDelete].quests[questIndexQuestToDelete].name : '' }}
+                    from {{ roomIndexQuestToDelete >= 0 ? dungeon.rooms[roomIndexQuestToDelete].name : '' }}?
+                  </v-card-text>
+                  <v-card-actions class="pa-2">
+                    <v-spacer></v-spacer>
+                    <v-btn text @click="deleteQuestDialog = false" class="ma-2">
+                      Cancel
+                    </v-btn>
+                    <v-btn
+                      color="error"
+                      text
+                      @click="confirmQuestDelete"
+                      class="ma-2"
+                    >Delete</v-btn>
+                    <v-spacer></v-spacer>
+                  </v-card-actions>
+                </v-card>
+              </v-dialog>
             </v-row>
           </template>
           <template v-else>
@@ -159,11 +325,43 @@
           v => (v || '').length >= 5 || 'Min 5 characters',
           v => (v || '').length <= 20 || 'Max 20 characters',
         ],
+        showUserNotAdded: false,
         userIndexToRemove: -1,
         removeUserDialog: false,
+        editQuestDialog: false,
+        editingQuest: false,
+        editQuestValid: false,
+        editQuestName: '',
+        questNameRules: [
+          v => !!v || 'Required',
+          v => (v || '').length >= 5 || 'Min 5 characters',
+          v => (v || '').length <= 30 || 'Max 30 characters',
+        ],
+        editQuestNote: '',
+        questNoteRules: [
+          v => (v || '').length <= 50 || 'Max 50 characters',
+        ],
+        editQuestDate: '',
+        editQuestDateFormatted: '',
+        editQuestDateMenu: false,
+        editQuestTime: '',
+        editQuestTimeMenu: false,
+        editQuestRoomIndex: -1,
+        editQuestIndex: -1,
+        roomIndexQuestToDelete: -1,
+        questIndexQuestToDelete: -1,
+        deleteQuestDialog: false,
       }),
       created() {
         socket.emit('fetch-dungeon', this.dungeonID, this.joiningIndex);
+      },
+      watch: {
+        editQuestDate(val) {
+          this.editQuestDateFormatted = this.formatDate(val);
+        },
+        editQuestTime(val) {
+          this.editQuestTimeFormatted = this.formatTime(val);
+        },
       },
       methods: {
         addUser() {
@@ -178,6 +376,93 @@
         confirmUserRemove() {
           this.removeUserDialog = false;
           socket.emit('remove-user', this.dungeonID, this.userIndexToRemove);
+        },
+        formatTime(time) {
+          if (!time) return null;
+          const [hour, minute] = time.split(':');
+          if (!hour || !minute) return null;
+          let hourInt = parseInt(hour);
+          let actualHourInt = hourInt;
+          if (hourInt == 0) actualHourInt = 12;
+          else if (hourInt > 12) actualHourInt -= 12;
+          return `${actualHourInt < 10 ? '0' : ''}${actualHourInt}:${minute} ${hourInt < 12 ? 'AM' : 'PM'}`;
+        },
+        parseTime(time) {
+          if (!time) return null;
+          const [hour, minute, isAM] = time.split(/[\:\ ]/);
+          if (!hour || !minute || !isAM) return null;
+          let hourInt = parseInt(hour);
+          let actualHourInt = hourInt;
+          if (isAM === 'AM' && hourInt === 12) actualHourInt = 0;
+          else if (isAM === 'PM' && hourInt < 12) actualHourInt += 12;
+          return `${actualHourInt < 10 ? '0' : ''}${actualHourInt}:${minute}`;
+        },
+        formatDate(date) {
+          if (!date) return null;
+          const [year, month, day] = date.split('-');
+          if (!year || !month || !day) return null;
+          return `${month}/${day}/${year}`;
+        },
+        parseDate(date) {
+          if (!date) return null;
+          const [month, day, year] = date.split('/');
+          if (!year || !month || !day) return null;
+          return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        },
+        getQuest(roomIndex, questIndex) {
+          if (roomIndex < 0 || roomIndex >= this.dungeon.rooms.length) return null;
+          const room = this.dungeon.rooms[roomIndex];
+          if (questIndex < 0 || questIndex >= room.quests.length) return null;
+          return room.quests[questIndex];
+        },
+        editQuest(roomIndex, questIndex) {
+          const quest = this.getQuest(roomIndex, questIndex);
+          if (!quest) return;
+          this.editQuestRoomIndex = roomIndex;
+          this.editQuestIndex = questIndex;
+          this.editQuestName = quest.name;
+          this.editQuestNote = quest.note;
+          this.editQuestDate = quest.date;
+          this.editQuestTime = quest.time;
+          this.editQuestDateFormatted = this.formatDate(quest.date);
+          this.editQuestTimeFormatted = this.formatTime(quest.time);
+          this.editQuestDialog = true;
+          this.editingQuest = true;
+        },
+        saveQuest() {
+          this.editQuestDialog = false;
+          socket.emit('save-quest', this.dungeonID, this.joiningIndex, this.editQuestRoomIndex, this.editQuestIndex,
+            this.editQuestName, this.editQuestNote, this.editQuestDate, this.editQuestTime);
+        },
+        toggleQuestComplete(roomIndex, questIndex) {
+          const quest = this.getQuest(roomIndex, questIndex);
+          if (!quest) return;
+          socket.emit('complete-quest', this.dungeonID, this.joiningIndex, roomIndex, questIndex, quest.completed);
+        },
+        newQuest(roomIndex) {
+          this.editQuestRoomIndex = roomIndex;
+          this.editQuestName = '';
+          this.editQuestNote = '';
+          this.editQuestDate = '';
+          this.editQuestTime = '';
+          this.editQuestDateFormatted = '';
+          this.editQuestTimeFormatted = '';
+          this.editQuestDialog = true;
+          this.editingQuest = false;
+        },
+        createQuest() {
+          this.editQuestDialog = false;
+          socket.emit('create-quest', this.dungeonID, this.joiningIndex, this.editQuestRoomIndex,
+            this.editQuestName, this.editQuestNote, this.editQuestDate, this.editQuestTime);
+        },
+        deleteQuest(roomIndex, questIndex) {
+          this.roomIndexQuestToDelete = roomIndex;
+          this.questIndexQuestToDelete = questIndex;
+          this.deleteQuestDialog = true;
+        },
+        confirmQuestDelete() {
+          this.deleteQuestDialog = false;
+          socket.emit('delete-quest', this.dungeonID, this.joiningIndex, this.roomIndexQuestToDelete, this.questIndexQuestToDelete);
         },
       },
     });

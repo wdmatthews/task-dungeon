@@ -1,6 +1,6 @@
 const { ObjectId } = require('bson');
 
-module.exports = function(io, MongoClient, mongoUrl, defaultDungeon) {
+module.exports = function(io, MongoClient, mongoUrl, defaultDungeon, xpIncrement) {
   async function runMongoCommand(fn) {
     let client = null;
     let result = null;
@@ -133,6 +133,33 @@ module.exports = function(io, MongoClient, mongoUrl, defaultDungeon) {
       if (deleted) socket.emit('delete-dungeon');
     });
     
+    async function getDungeonAndOwner(dungeonID, joiningIndex) {
+      const session = socket.request.session;
+      const { dungeon, ownerID } = await runMongoCommand(async (client) => {
+        let joinedDungeon = null;
+        
+        if (joiningIndex >= 0) {
+          const user = await client
+            .db('task_dungeon')
+            .collection('users')
+            .findOne({ _id: ObjectId(session.userID) });
+          if (joiningIndex >= user.joinedDungeons.length) return null;
+          joinedDungeon = user.joinedDungeons[joiningIndex];
+          dungeonID = joinedDungeon.dungeonID;
+        }
+        
+        const query = dungeonID && /^[0-9a-f]{24}$/.test(dungeonID) ? { _id: ObjectId(dungeonID) } : { name: 'My Dungeon' };
+        const userDungeon = await client
+          .db('task_dungeon')
+          .collection(joinedDungeon ? `user_${joinedDungeon.userID}` : `user_${session.userID}`)
+          .findOne(query);
+        
+        return { dungeon: userDungeon, ownerID: joinedDungeon ? joinedDungeon.userID : session.userID };
+      });
+      
+      return { dungeon, ownerID };
+    }
+    
     socket.on('fetch-dungeon', async (dungeonID, joiningIndex) => {
       if (!dungeonID) dungeonID = '';
       if (joiningIndex == null) joiningIndex = -1;
@@ -144,33 +171,13 @@ module.exports = function(io, MongoClient, mongoUrl, defaultDungeon) {
       }
       
       try {
-        const dungeon = await runMongoCommand(async (client) => {
-          let joinedDungeon = null;
-          
-          if (!dungeonID && joiningIndex >= 0) {
-            const user = await client
-              .db('task_dungeon')
-              .collection('users')
-              .findOne({ _id: ObjectId(session.userID) });
-            if (joiningIndex >= user.joinedDungeons.length) return null;
-            joinedDungeon = user.joinedDungeons[joiningIndex];
-            dungeonID = joinedDungeon.dungeonID;
-          }
-          
-          const query = dungeonID && /^[0-9a-f]{24}$/.test(dungeonID) ? { _id: ObjectId(dungeonID) } : { name: 'My Dungeon' };
-          const userDungeon = await client
-            .db('task_dungeon')
-            .collection(!joinedDungeon ? `user_${session.userID}` : `user_${joinedDungeon.userID}`)
-            .findOne(query);
-          
-          if (userDungeon && userDungeon.otherUsers) {
-            userDungeon.otherUsers.forEach(user => {
-              delete user._id;
-            });
-          }
-          
-          return userDungeon;
-        });
+        const { dungeon } = await getDungeonAndOwner(dungeonID, joiningIndex);
+        
+        if (dungeon && dungeon.otherUsers) {
+          dungeon.otherUsers.forEach(user => {
+            delete user._id;
+          });
+        }
         
         socket.emit('receive-dungeon', dungeon);
       } catch (error) {
@@ -196,6 +203,7 @@ module.exports = function(io, MongoClient, mongoUrl, defaultDungeon) {
             .db('task_dungeon')
             .collection('users');
           const user = await users.findOne({ username });
+          if (!user) return null;
           const userID = user._id.toString();
           if (userID === session.userID) return null;
           
@@ -225,7 +233,7 @@ module.exports = function(io, MongoClient, mongoUrl, defaultDungeon) {
           return userToAdd;
         });
         
-        if (joinedUser) socket.emit('add-user', joinedUser);
+        socket.emit('add-user', joinedUser);
       } catch (error) {
         console.log(error);
       }
@@ -271,6 +279,184 @@ module.exports = function(io, MongoClient, mongoUrl, defaultDungeon) {
         });
         
         if (removedUser) socket.emit('remove-user');
+      } catch (error) {
+        console.log(error);
+      }
+    });
+    
+    socket.on('save-quest', async (dungeonID, joiningIndex, roomIndex, questIndex, name, note, date, time) => {
+      if (joiningIndex == null) joiningIndex = -1;
+      const session = socket.request.session;
+      if (!session || typeof session.userID !== 'string'
+        || typeof dungeonID !== 'string' || typeof joiningIndex !== 'number'
+        || typeof roomIndex !== 'number' || typeof questIndex !== 'number'
+        || typeof name !== 'string' || typeof note !== 'string'
+        || typeof date !== 'string' || typeof time !== 'string') return;
+      if (dungeonID && !/^[0-9a-f]{24}$/.test(dungeonID)) return;
+      if (name.length > 30) name = name.substring(0, 30);
+      if (note.length > 50) note = note.substring(0, 50);
+      if (date.length > 10) date = date.substring(0, 10);
+      if (time.length > 5) time = time.substring(0, 5);
+      
+      try {
+        const savedQuest = await runMongoCommand(async (client) => {
+          const { dungeon, ownerID } = await getDungeonAndOwner(dungeonID, joiningIndex);
+          if (!dungeon) return false;
+          const dungeons = client
+            .db('task_dungeon')
+            .collection(`user_${ownerID}`);
+          if (roomIndex < 0 || roomIndex >= dungeon.rooms.length) return false;
+          const room = dungeon.rooms[roomIndex];
+          if (questIndex < 0 || questIndex >= room.quests.length) return false;
+          const quest = room.quests[questIndex];
+          
+          quest.name = name;
+          quest.note = note;
+          quest.date = date;
+          quest.time = time;
+          
+          await dungeons.updateOne({ _id: ObjectId(dungeonID) }, {
+            $set: { rooms: dungeon.rooms },
+          });
+          
+          return true;
+        });
+        
+        if (savedQuest) socket.emit('save-quest', roomIndex, questIndex, name, note, date, time);
+      } catch (error) {
+        console.log(error);
+      }
+    });
+    
+    socket.on('complete-quest', async (dungeonID, joiningIndex, roomIndex, questIndex, isCompleted) => {
+      if (joiningIndex == null) joiningIndex = -1;
+      const session = socket.request.session;
+      if (!session || typeof session.userID !== 'string'
+        || typeof dungeonID !== 'string' || typeof joiningIndex !== 'number'
+        || typeof roomIndex !== 'number' || typeof questIndex !== 'number'
+        || typeof isCompleted !== 'boolean') return;
+      if (dungeonID && !/^[0-9a-f]{24}$/.test(dungeonID)) return;
+      
+      try {
+        const completedQuest = await runMongoCommand(async (client) => {
+          const { dungeon, ownerID } = await getDungeonAndOwner(dungeonID, joiningIndex);
+          if (!dungeon) return false;
+          if (roomIndex < 0 || roomIndex >= dungeon.rooms.length) return false;
+          const room = dungeon.rooms[roomIndex];
+          if (questIndex < 0 || questIndex >= room.quests.length) return false;
+          const quest = room.quests[questIndex];
+          
+          quest.completed = isCompleted;
+          const previouslyCompleted = quest.previouslyCompleted;
+          if (isCompleted && !previouslyCompleted) {
+            quest.previouslyCompleted = true;
+          }
+          
+          await client
+            .db('task_dungeon')
+            .collection(`user_${ownerID}`)
+            .updateOne({ _id: ObjectId(dungeonID) }, {
+              $set: { rooms: dungeon.rooms },
+            });
+          
+          let userIDs = [ownerID];
+          dungeon.otherUsers.forEach(user => userIDs.push(user._id));
+          
+          if (isCompleted && !previouslyCompleted) {
+            for (const userID of userIDs) {
+              await client
+                .db('task_dungeon')
+                .collection('users')
+                .updateOne({ _id: ObjectId(userID) }, {
+                  $inc: { xp: xpIncrement },
+                });
+            }
+          }
+          
+          return true;
+        });
+        
+        if (completedQuest) socket.emit('completed-quest', roomIndex, questIndex, isCompleted);
+      } catch (error) {
+        console.log(error);
+      }
+    });
+    
+    socket.on('create-quest', async (dungeonID, joiningIndex, roomIndex, name, note, date, time) => {
+      if (joiningIndex == null) joiningIndex = -1;
+      const session = socket.request.session;
+      if (!session || typeof session.userID !== 'string'
+        || typeof dungeonID !== 'string' || typeof joiningIndex !== 'number'
+        || typeof roomIndex !== 'number' || typeof name !== 'string'
+        || typeof note !== 'string' || typeof date !== 'string'
+        || typeof time !== 'string') return;
+      if (dungeonID && !/^[0-9a-f]{24}$/.test(dungeonID)) return;
+      if (name.length > 30) name = name.substring(0, 30);
+      if (note.length > 50) note = note.substring(0, 50);
+      if (date.length > 10) date = date.substring(0, 10);
+      if (time.length > 5) time = time.substring(0, 5);
+      
+      try {
+        const createdQuest = await runMongoCommand(async (client) => {
+          const { dungeon, ownerID } = await getDungeonAndOwner(dungeonID, joiningIndex);
+          if (!dungeon) return false;
+          const dungeons = client
+            .db('task_dungeon')
+            .collection(`user_${ownerID}`);
+          if (roomIndex < 0 || roomIndex >= dungeon.rooms.length) return false;
+          const room = dungeon.rooms[roomIndex];
+          
+          room.quests.push({
+            name,
+            completed: false,
+            previouslyCompleted: false,
+            note,
+            date,
+            time,
+          });
+          
+          await dungeons.updateOne({ _id: ObjectId(dungeonID) }, {
+            $set: { rooms: dungeon.rooms },
+          });
+          
+          return true;
+        });
+        
+        if (createdQuest) socket.emit('created-quest', roomIndex, name, note, date, time);
+      } catch (error) {
+        console.log(error);
+      }
+    });
+    
+    socket.on('delete-quest', async (dungeonID, joiningIndex, roomIndex, questIndex) => {
+      if (joiningIndex == null) joiningIndex = -1;
+      const session = socket.request.session;
+      if (!session || typeof session.userID !== 'string'
+        || typeof dungeonID !== 'string' || typeof joiningIndex !== 'number'
+        || typeof roomIndex !== 'number' || typeof questIndex !== 'number') return;
+      if (dungeonID && !/^[0-9a-f]{24}$/.test(dungeonID)) return;
+      
+      try {
+        const deletedQuest = await runMongoCommand(async (client) => {
+          const { dungeon, ownerID } = await getDungeonAndOwner(dungeonID, joiningIndex);
+          if (!dungeon) return false;
+          if (roomIndex < 0 || roomIndex >= dungeon.rooms.length) return false;
+          const room = dungeon.rooms[roomIndex];
+          if (questIndex < 0 || questIndex >= room.quests.length) return false;
+          
+          room.quests.splice(questIndex, 1);
+          
+          await client
+            .db('task_dungeon')
+            .collection(`user_${ownerID}`)
+            .updateOne({ _id: ObjectId(dungeonID) }, {
+              $set: { rooms: dungeon.rooms },
+            });
+          
+          return true;
+        });
+        
+        if (deletedQuest) socket.emit('deleted-quest');
       } catch (error) {
         console.log(error);
       }
