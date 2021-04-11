@@ -72,11 +72,21 @@ socket.on('created-quest', (roomIndex, name, note, date, time) => {
   room.quests.push({ name, note, date, time });
 });
 
-socket.on('deleted-quest', () => {
-  if (vue.roomIndexQuestToDelete < 0 || vue.roomIndexQuestToDelete >= vue.dungeon.rooms.length) return;
-  const room = vue.dungeon.rooms[vue.roomIndexQuestToDelete];
-  if (vue.questIndexQuestToDelete < 0 || vue.questIndexQuestToDelete >= room.quests.length) return;
-  room.quests.splice(vue.questIndexQuestToDelete, 1);
+socket.on('deleted-quest', (roomIndex, questIndex) => {
+  if (roomIndex < 0 || roomIndex >= vue.dungeon.rooms.length) return;
+  const room = vue.dungeon.rooms[roomIndex];
+  if (questIndex < 0 || questIndex >= room.quests.length) return;
+  room.quests.splice(questIndex, 1);
   vue.roomIndexQuestToDelete = -1;
   vue.questIndexQuestToDelete = -1;
+});
+
+socket.on('created-room', (name) => {
+  vue.dungeon.rooms.push({ name, quests: [] });
+});
+
+socket.on('deleted-room', (roomIndex) => {
+  if (roomIndex < 0 || roomIndex >= vue.dungeon.rooms.length) return;
+  vue.dungeon.rooms.splice(roomIndex, 1);
+  vue.roomIndexToDelete = -1;
 });

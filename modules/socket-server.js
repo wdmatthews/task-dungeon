@@ -1,6 +1,6 @@
 const { ObjectId } = require('bson');
 
-module.exports = function(io, MongoClient, mongoUrl, defaultDungeon, xpIncrement) {
+module.exports = function(io, MongoClient, mongoUrl, xpIncrement) {
   async function runMongoCommand(fn) {
     let client = null;
     let result = null;
@@ -106,7 +106,7 @@ module.exports = function(io, MongoClient, mongoUrl, defaultDungeon, xpIncrement
           .collection(`user_${session.userID}`);
         let dungeon = await dungeons.findOne({ name });
         if (dungeon) return null;
-        await dungeons.insertOne({ name, ...defaultDungeon });
+        await dungeons.insertOne({ name, otherUsers: [], rooms: [] });
         dungeon = await dungeons.findOne({ name });
         delete dungeon.otherUsers;
         return dungeon;
@@ -171,7 +171,7 @@ module.exports = function(io, MongoClient, mongoUrl, defaultDungeon, xpIncrement
       }
       
       try {
-        const { dungeon } = await getDungeonAndOwner(dungeonID, joiningIndex);
+        const { dungeon, ownerID } = await getDungeonAndOwner(dungeonID, joiningIndex);
         
         if (dungeon && dungeon.otherUsers) {
           dungeon.otherUsers.forEach(user => {
@@ -180,6 +180,8 @@ module.exports = function(io, MongoClient, mongoUrl, defaultDungeon, xpIncrement
         }
         
         socket.emit('receive-dungeon', dungeon);
+        
+        if (dungeon) socket.join(`dungeon_${ownerID}_${dungeon._id}`);
       } catch (error) {
         console.log(error);
       }
@@ -299,9 +301,11 @@ module.exports = function(io, MongoClient, mongoUrl, defaultDungeon, xpIncrement
       if (time.length > 5) time = time.substring(0, 5);
       
       try {
+        let oID;
         const savedQuest = await runMongoCommand(async (client) => {
           const { dungeon, ownerID } = await getDungeonAndOwner(dungeonID, joiningIndex);
           if (!dungeon) return false;
+          oID = ownerID;
           const dungeons = client
             .db('task_dungeon')
             .collection(`user_${ownerID}`);
@@ -322,7 +326,7 @@ module.exports = function(io, MongoClient, mongoUrl, defaultDungeon, xpIncrement
           return true;
         });
         
-        if (savedQuest) socket.emit('save-quest', roomIndex, questIndex, name, note, date, time);
+        if (savedQuest) io.in(`dungeon_${oID}_${dungeonID}`).emit('save-quest', roomIndex, questIndex, name, note, date, time);
       } catch (error) {
         console.log(error);
       }
@@ -338,9 +342,11 @@ module.exports = function(io, MongoClient, mongoUrl, defaultDungeon, xpIncrement
       if (dungeonID && !/^[0-9a-f]{24}$/.test(dungeonID)) return;
       
       try {
+        let oID;
         const completedQuest = await runMongoCommand(async (client) => {
           const { dungeon, ownerID } = await getDungeonAndOwner(dungeonID, joiningIndex);
           if (!dungeon) return false;
+          oID = ownerID;
           if (roomIndex < 0 || roomIndex >= dungeon.rooms.length) return false;
           const room = dungeon.rooms[roomIndex];
           if (questIndex < 0 || questIndex >= room.quests.length) return false;
@@ -359,6 +365,7 @@ module.exports = function(io, MongoClient, mongoUrl, defaultDungeon, xpIncrement
               $set: { rooms: dungeon.rooms },
             });
           
+          if (!dungeon.otherUsers) return true;
           let userIDs = [ownerID];
           dungeon.otherUsers.forEach(user => userIDs.push(user._id));
           
@@ -376,7 +383,7 @@ module.exports = function(io, MongoClient, mongoUrl, defaultDungeon, xpIncrement
           return true;
         });
         
-        if (completedQuest) socket.emit('completed-quest', roomIndex, questIndex, isCompleted);
+        if (completedQuest) io.in(`dungeon_${oID}_${dungeonID}`).emit('completed-quest', roomIndex, questIndex, isCompleted);
       } catch (error) {
         console.log(error);
       }
@@ -397,9 +404,11 @@ module.exports = function(io, MongoClient, mongoUrl, defaultDungeon, xpIncrement
       if (time.length > 5) time = time.substring(0, 5);
       
       try {
+        let oID;
         const createdQuest = await runMongoCommand(async (client) => {
           const { dungeon, ownerID } = await getDungeonAndOwner(dungeonID, joiningIndex);
           if (!dungeon) return false;
+          oID = ownerID;
           const dungeons = client
             .db('task_dungeon')
             .collection(`user_${ownerID}`);
@@ -422,7 +431,7 @@ module.exports = function(io, MongoClient, mongoUrl, defaultDungeon, xpIncrement
           return true;
         });
         
-        if (createdQuest) socket.emit('created-quest', roomIndex, name, note, date, time);
+        if (createdQuest) io.in(`dungeon_${oID}_${dungeonID}`).emit('created-quest', roomIndex, name, note, date, time);
       } catch (error) {
         console.log(error);
       }
@@ -437,9 +446,11 @@ module.exports = function(io, MongoClient, mongoUrl, defaultDungeon, xpIncrement
       if (dungeonID && !/^[0-9a-f]{24}$/.test(dungeonID)) return;
       
       try {
+        let oID;
         const deletedQuest = await runMongoCommand(async (client) => {
           const { dungeon, ownerID } = await getDungeonAndOwner(dungeonID, joiningIndex);
           if (!dungeon) return false;
+          oID = ownerID;
           if (roomIndex < 0 || roomIndex >= dungeon.rooms.length) return false;
           const room = dungeon.rooms[roomIndex];
           if (questIndex < 0 || questIndex >= room.quests.length) return false;
@@ -456,7 +467,75 @@ module.exports = function(io, MongoClient, mongoUrl, defaultDungeon, xpIncrement
           return true;
         });
         
-        if (deletedQuest) socket.emit('deleted-quest');
+        if (deletedQuest) io.in(`dungeon_${oID}_${dungeonID}`).emit('deleted-quest', roomIndex, questIndex);
+      } catch (error) {
+        console.log(error);
+      }
+    });
+    
+    socket.on('create-room', async (dungeonID, joiningIndex, name) => {
+      if (joiningIndex == null) joiningIndex = -1;
+      const session = socket.request.session;
+      if (!session || typeof session.userID !== 'string'
+        || typeof dungeonID !== 'string' || typeof joiningIndex !== 'number'
+        || typeof name !== 'string') return;
+      if (dungeonID && !/^[0-9a-f]{24}$/.test(dungeonID)) return;
+      if (name.length > 30) name = name.substring(0, 30);
+      
+      try {
+        let oID;
+        const createdRoom = await runMongoCommand(async (client) => {
+          const { dungeon, ownerID } = await getDungeonAndOwner(dungeonID, joiningIndex);
+          if (!dungeon) return false;
+          oID = ownerID;
+          
+          dungeon.rooms.push({ name, quests: [] });
+          
+          await client
+            .db('task_dungeon')
+            .collection(`user_${ownerID}`)
+            .updateOne({ _id: ObjectId(dungeonID) }, {
+              $set: { rooms: dungeon.rooms },
+            });
+          
+          return true;
+        });
+        
+        if (createdRoom) io.in(`dungeon_${oID}_${dungeonID}`).emit('created-room', name);
+      } catch (error) {
+        console.log(error);
+      }
+    });
+    
+    socket.on('delete-room', async (dungeonID, joiningIndex, roomIndex) => {
+      if (joiningIndex == null) joiningIndex = -1;
+      const session = socket.request.session;
+      if (!session || typeof session.userID !== 'string'
+        || typeof dungeonID !== 'string' || typeof joiningIndex !== 'number'
+        || typeof roomIndex !== 'number') return;
+      if (dungeonID && !/^[0-9a-f]{24}$/.test(dungeonID)) return;
+      
+      try {
+        let oID;
+        const deletedRoom = await runMongoCommand(async (client) => {
+          const { dungeon, ownerID } = await getDungeonAndOwner(dungeonID, joiningIndex);
+          if (!dungeon) return false;
+          oID = ownerID;
+          if (roomIndex < 0 || roomIndex >= dungeon.rooms.length) return false;
+          
+          dungeon.rooms.splice(roomIndex, 1);
+          
+          await client
+            .db('task_dungeon')
+            .collection(`user_${ownerID}`)
+            .updateOne({ _id: ObjectId(dungeonID) }, {
+              $set: { rooms: dungeon.rooms },
+            });
+          
+          return true;
+        });
+        
+        if (deletedRoom) io.in(`dungeon_${oID}_${dungeonID}`).emit('deleted-room', roomIndex);
       } catch (error) {
         console.log(error);
       }

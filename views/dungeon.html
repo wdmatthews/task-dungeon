@@ -115,9 +115,12 @@
                 </v-card>
               </v-dialog>
               <v-col cols="12" md="3" class="pa-2" v-for="(room, i) in dungeon.rooms" :key="i">
-                <v-card>
+                <v-card max-width="500" class="mx-auto">
                   <v-card-title class="pa-4">
                     <span class="mx-auto" v-text="room.name"></span>
+                    <v-btn icon absolute right>
+                      <v-icon color="error" @click="deleteRoom(i)">mdi-close-circle</v-icon>
+                    </v-btn>
                   </v-card-title>
                   <v-card-text>
                     <v-list flat three-line>
@@ -145,11 +148,20 @@
                           color="primary"
                           elevation="2"
                           @click="newQuest(i)"
-                        >New</v-btn>
+                        >New Quest</v-btn>
                       </div>
                     </v-list>
                   </v-card-text>
                 </v-card>
+              </v-col>
+              <v-col cols="12" class="pa-2">
+                <v-row no-gutters align="center" justify="center">
+                  <v-btn
+                    color="primary"
+                    elevation="2"
+                    @click="createRoomDialog = true"
+                  >New Room</v-btn>
+                </v-row>
               </v-col>
               <v-dialog v-model="editQuestDialog" max-width="400" scrollable>
                 <v-card>
@@ -163,7 +175,7 @@
                         label="Name"
                         outlined
                         required
-                        :rules="questNameRules"
+                        :rules="nameRules"
                         :counter="30"
                       ></v-text-field>
                       <v-textarea
@@ -275,6 +287,62 @@
                   </v-card-actions>
                 </v-card>
               </v-dialog>
+              <v-dialog v-model="createRoomDialog" max-width="400" scrollable>
+                <v-card>
+                  <v-card-title class="pa-4">
+                    <span class="mx-auto">Create Room</span>
+                  </v-card-title>
+                  <v-card-text class="px-4 py-1">
+                    <v-form v-model="createRoomValid" @submit.prevent>
+                      <v-text-field
+                        v-model="createRoomName"
+                        label="Name"
+                        outlined
+                        required
+                        :rules="nameRules"
+                        :counter="30"
+                      ></v-text-field>
+                    </v-form>
+                  </v-card-text>
+                  <v-card-actions class="pa-2">
+                    <v-spacer></v-spacer>
+                    <v-btn text @click="createRoomDialog = false" class="ma-2">
+                      Cancel
+                    </v-btn>
+                    <v-btn
+                      color="primary"
+                      text
+                      @click="createRoom"
+                      class="ma-2"
+                      :disabled="!createRoomValid"
+                    >Create</v-btn>
+                    <v-spacer></v-spacer>
+                  </v-card-actions>
+                </v-card>
+              </v-dialog>
+              <v-dialog v-model="deleteRoomDialog" max-width="300">
+                <v-card>
+                  <v-card-title class="pa-4">
+                    <span class="mx-auto">Delete Room</span>
+                  </v-card-title>
+                  <v-card-text class="px-4 py-0 text-center">
+                    Delete {{ roomIndexToDelete >= 0 ? dungeon.rooms[roomIndexToDelete].name : '' }}?
+                  </v-card-text>
+                  <v-card-actions class="pa-2">
+                    <v-spacer></v-spacer>
+                    <v-btn text @click="deleteRoomDialog = false" class="ma-2">
+                      Cancel
+                    </v-btn>
+                    <v-btn
+                      color="error"
+                      text
+                      @click="confirmRoomDelete"
+                      class="ma-2"
+                    >Delete</v-btn>
+                    <v-spacer></v-spacer>
+                  </v-card-actions>
+                </v-card>
+              </v-dialog>
             </v-row>
           </template>
           <template v-else>
@@ -332,7 +400,7 @@
         editingQuest: false,
         editQuestValid: false,
         editQuestName: '',
-        questNameRules: [
+        nameRules: [
           v => !!v || 'Required',
           v => (v || '').length >= 5 || 'Min 5 characters',
           v => (v || '').length <= 30 || 'Max 30 characters',
@@ -351,6 +419,11 @@
         roomIndexQuestToDelete: -1,
         questIndexQuestToDelete: -1,
         deleteQuestDialog: false,
+        createRoomName: '',
+        createRoomDialog: false,
+        createRoomValid: false,
+        roomIndexToDelete: -1,
+        deleteRoomDialog: false,
       }),
       created() {
         socket.emit('fetch-dungeon', this.dungeonID, this.joiningIndex);
@@ -463,6 +536,19 @@
         confirmQuestDelete() {
           this.deleteQuestDialog = false;
           socket.emit('delete-quest', this.dungeonID, this.joiningIndex, this.roomIndexQuestToDelete, this.questIndexQuestToDelete);
+        },
+        createRoom() {
+          this.createRoomDialog = false;
+          socket.emit('create-room', this.dungeonID, this.joiningIndex, this.createRoomName);
+          this.createRoomName = '';
+        },
+        deleteRoom(roomIndex) {
+          this.roomIndexToDelete = roomIndex;
+          this.deleteRoomDialog = true;
+        },
+        confirmRoomDelete() {
+          this.deleteRoomDialog = false;
+          socket.emit('delete-room', this.dungeonID, this.joiningIndex, this.roomIndexToDelete);
         },
       },
     });

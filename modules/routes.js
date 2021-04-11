@@ -1,4 +1,4 @@
-module.exports = function(app, auth, MongoClient, mongoUrl, defaultDungeon) {
+module.exports = function(app, auth, MongoClient, mongoUrl) {
   const resFileOptions = { root: './views' };
   
   app.get('/', (req, res) => {
@@ -51,13 +51,74 @@ module.exports = function(app, auth, MongoClient, mongoUrl, defaultDungeon) {
       let client = null;
       
       try {
-        const dungeon = { name: 'My Dungeon', ...defaultDungeon };
+        const dungeon = { name: 'My Dungeon', otherUsers: [], rooms: [] };
+        dungeon.rooms.push({ name: 'General', quests: [
+          {
+            name: 'Create a Quest',
+            completed: false,
+            previouslyCompleted: false,
+            note: 'Press the "New Room" button below.',
+            date: '',
+            time: '',
+          },
+          {
+            name: 'Edit a Quest',
+            completed: false,
+            previouslyCompleted: false,
+            note: 'Press the Pencil/Edit Icon to the right.',
+            date: '',
+            time: '',
+          },
+          {
+            name: 'Complete a Quest',
+            completed: false,
+            previouslyCompleted: false,
+            note: 'Press the checkbox to the left.',
+            date: '',
+            time: '',
+          },
+          {
+            name: 'Delete a Quest',
+            completed: false,
+            previouslyCompleted: false,
+            note: 'Press the X/Delete Icon to the right.',
+            date: '',
+            time: '',
+          },
+          {
+            name: 'Delete a Room',
+            completed: false,
+            previouslyCompleted: false,
+            note: 'Press the X/Delete Icon to the top right of this room.',
+            date: '',
+            time: '',
+          },
+        ] });
         delete dungeon.otherUsers;
+        const otherDungeon = { name: 'Other Dungeon', otherUsers: [], rooms: [] };
+        otherDungeon.rooms.push({ name: 'General', quests: [
+          {
+            name: 'Add a User',
+            completed: false,
+            previouslyCompleted: false,
+            note: 'Press the "Add" button above, and enter another user\'s username.',
+            date: '',
+            time: '',
+          },
+          {
+            name: 'Remove a User',
+            completed: false,
+            previouslyCompleted: false,
+            note: 'Press the X/Remove Icon to the right of an added user.',
+            date: '',
+            time: '',
+          },
+        ] });
         client = await MongoClient.connect(mongoUrl, { useUnifiedTopology: true });
         const dungeons = client
           .db('task_dungeon')
           .collection(`user_${registerResult}`);
-        await dungeons.insertOne(dungeon);
+        await dungeons.insertMany([dungeon, otherDungeon]);
       } finally {
         await client.close();
       }
