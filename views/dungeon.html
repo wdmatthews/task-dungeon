@@ -23,7 +23,7 @@
       <v-main>
         <template v-if="dungeonReceived">
           <template v-if="dungeon">
-            <v-row no-gutters class="pa-2">
+            <v-row no-gutters justify="center" class="pa-2">
               <v-col cols="12" class="pa-2" v-if="dungeon.name !== 'My Dungeon' && joiningIndex < 0">
                 <v-card max-width="500" class="mx-auto">
                   <v-alert

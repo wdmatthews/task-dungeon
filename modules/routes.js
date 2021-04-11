@@ -1,3 +1,5 @@
+const { ObjectId } = require('bson');
+
 module.exports = function(app, auth, MongoClient, mongoUrl) {
   const resFileOptions = { root: './views' };
   
@@ -26,6 +28,73 @@ module.exports = function(app, auth, MongoClient, mongoUrl) {
   });
   
   app.get('/logout', auth.requireAuth('/dungeon'), auth.logout, (req, res) => res.redirect('/login'));
+  
+  app.get('/deleteaccount', auth.requireAuth('/login'), async (req, res) => {
+    const session = req.session;
+    let client = null;
+    
+    try {
+      client = await MongoClient.connect(mongoUrl, { useUnifiedTopology: true });
+      const users = client
+        .db('task_dungeon')
+        .collection('users');
+      const user = await users.findOne({ _id: ObjectId(session.userID) });
+      const dungeons = await client
+        .db('task_dungeon')
+        .collection(`user_${session.userID}`)
+        .find().toArray();
+      
+      for (const dungeon of dungeons) {
+        if (!dungeon.otherUsers || dungeon.otherUsers.length === 0) continue;
+        
+        for (const otherUser of dungeon.otherUsers) {
+          const userData = await users.findOne({ _id: ObjectId(otherUser._id) });
+          
+          for (let i = userData.joinedDungeons.length - 1; i >= 0; i--) {
+            const joinedDungeon = userData.joinedDungeons[i];
+            if (joinedDungeon.userID === session.userID && joinedDungeon.dungeonID === dungeon._id.toString()) {
+              userData.joinedDungeons.splice(i, 1);
+              break;
+            }
+          }
+          
+          await users.updateOne({ _id: ObjectId(otherUser._id) }, {
+            $set: { joinedDungeons: userData.joinedDungeons },
+          });
+        }
+      }
+      
+      for (const joinedDungeon of user.joinedDungeons) {
+        const dungeonCollection = client
+          .db('task_dungeon')
+          .collection(`user_${joinedDungeon.userID}`);
+        const dungeon = await dungeonCollection.findOne({ _id: ObjectId(joinedDungeon.dungeonID) });
+        if (!dungeon.otherUsers || dungeon.otherUsers.length === 0) return;
+        
+        for (let i = dungeon.otherUsers.length - 1; i >= 0; i--) {
+          const otherUser = dungeon.otherUsers[i];
+          if (otherUser._id === session.userID) {
+            dungeon.otherUsers.splice(i, 1);
+            break;
+          }
+        }
+        
+        await dungeonCollection.updateOne({ _id: ObjectId(joinedDungeon.dungeonID) }, {
+          $set: { otherUsers: dungeon.otherUsers },
+        });
+      }
+      
+      await client
+        .db('task_dungeon')
+        .collection(`user_${session.userID}`)
+        .drop();
+      await users.deleteOne({ _id: ObjectId(session.userID) });
+    } finally {
+      await client.close();
+    }
+    
+    res.redirect('/logout');
+  });
   
   app.post('/api/register', auth.requireNoAuth('/dungeon'), async (req, res) => {
     let name = req.body.name;

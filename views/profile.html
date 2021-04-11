@@ -58,6 +58,11 @@
                   </template>
                 </v-progress-linear>
               </v-card-text>
+              <v-card-actions class="px-4 pb-4 pt-0">
+                <v-spacer></v-spacer>
+                <v-btn color="error" elevation="2" @click="deleteAccountDialog = true">Delete Account</v-btn>
+                <v-spacer></v-spacer>
+              </v-card-actions>
             </v-card>
             <v-dialog v-model="iconDialog" max-width="300">
               <v-card>
@@ -87,6 +92,29 @@
                   <v-btn color="primary" text @click="changeIcon" class="ma-2">
                     Change
                   </v-btn>
+                  <v-spacer></v-spacer>
+                </v-card-actions>
+              </v-card>
+            </v-dialog>
+            <v-dialog v-model="deleteAccountDialog" max-width="300">
+              <v-card>
+                <v-card-title class="pa-4">
+                  <span class="mx-auto">Delete Account</span>
+                </v-card-title>
+                <v-card-text class="px-4 py-0 text-center">
+                  Are you sure to want to delete your account?
+                </v-card-text>
+                <v-card-actions class="pa-2">
+                  <v-spacer></v-spacer>
+                  <v-btn text @click="deleteAccountDialog = false" class="ma-2">
+                    Cancel
+                  </v-btn>
+                  <v-btn
+                    color="error"
+                    text
+                    class="ma-2"
+                    href="/deleteaccount"
+                  >Delete</v-btn>
                   <v-spacer></v-spacer>
                 </v-card-actions>
               </v-card>
@@ -130,6 +158,7 @@
           'spiked-dragon-head',
         ],
         selectedIcon: 'brutal-helm',
+        deleteAccountDialog: false,
       }),
       created() {
         socket.emit('fetch-profile');
